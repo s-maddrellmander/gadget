@@ -32,6 +32,9 @@ Repository = "https://github.com/s-maddrellmander/gadget"
 Issues = "https://github.com/s-maddrellmander/gadget/issues"
 
 [project.optional-dependencies]
+mem = [
+  "psutil>=5.9"
+]
 dev = [
   "pytest>=8.0",
   "pytest-cov>=5.0"

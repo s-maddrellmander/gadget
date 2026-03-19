@@ -83,6 +83,102 @@ class Gadget:
             self.group_times = {}
         elif group in self.group_times:
             del self.group_times[group]
+    
+    def mem(self, label='', _caller_frame=None):
+        """Log memory usage at a checkpoint. Requires psutil (optional dependency).
+        
+        Color-coded output:
+        - Green: all memory < 50%
+        - Yellow: any memory 50-80%
+        - Red: any memory > 80%
+        
+        Usage:
+            timer = Gadget()
+            timer.mem("after_loading_data")
+            timer.mem("model_initialized")
+        """
+        try:
+            import psutil
+        except ImportError:
+            print("gadget_mem requires psutil: pip install 'gadget-timer[mem]' or pip install psutil")
+            return
+        
+        if not self.verbose:
+            return
+        
+        # Use provided caller frame or get it from stack
+        if _caller_frame is None:
+            caller_frame = inspect.currentframe().f_back
+        else:
+            caller_frame = _caller_frame
+        frame_info = inspect.getframeinfo(caller_frame)
+        line_number = frame_info.lineno
+        
+        # Memory metrics
+        proc = psutil.Process(os.getpid())
+        mem = proc.memory_info()
+        rss_gb = mem.rss / 1e9
+        
+        sys_mem = psutil.virtual_memory()
+        swap = psutil.swap_memory()
+        
+        # Calculate percentage from displayed values
+        sys_percent = (sys_mem.used / sys_mem.total) * 100
+        
+        # RSS as % of total system memory
+        rss_percent = (rss_gb / (sys_mem.total / 1e9)) * 100
+        
+        # Calculate swap percentage
+        swap_percent = 0
+        if swap.total > 0:
+            swap_percent = (swap.used / swap.total) * 100
+        
+        # Build output parts with percentages
+        parts = [
+            f"RSS={rss_gb:.2f}GB({rss_percent:.0f}%)",
+            f"swap={swap.used / 1e9:.2f}GB({swap_percent:.0f}%)",
+            f"sys={sys_mem.used / 1e9:.1f}/{sys_mem.total / 1e9:.1f}GB({sys_percent:.0f}%)",
+        ]
+        
+        # Collect all percentages for color determination
+        percentages = [sys_percent, rss_percent]
+        
+        if swap.total > 0:
+            percentages.append(swap_percent)
+        
+        # Optional GPU info
+        try:
+            import torch
+            if torch.cuda.is_available():
+                gpu_used = torch.cuda.memory_allocated() / 1e9
+                gpu_total = torch.cuda.get_device_properties(0).total_memory / 1e9
+                gpu_percent = (gpu_used / gpu_total) * 100
+                parts.append(f"gpu={gpu_used:.1f}/{gpu_total:.1f}GB({gpu_percent:.0f}%)")
+                percentages.append(gpu_percent)
+        except:
+            pass
+        
+        # Determine color based on highest usage
+        max_percent = max(percentages)
+        if max_percent > 80:
+            color = "\033[31m"  # Red
+        elif max_percent >= 50:
+            color = "\033[33m"  # Yellow
+        else:
+            color = "\033[32m"  # Green
+        
+        reset_color = "\033[0m"
+        
+        # Format file location
+        try:
+            short_path = os.path.relpath(frame_info.filename)
+        except:
+            short_path = os.path.basename(frame_info.filename)
+        
+        file_link = f"→ {short_path}:{line_number}"
+        mem_label = f"[mem:{label}]" if label else "[mem]"
+        output = f"{color}{mem_label} {' '.join(parts)}{reset_color} {file_link}"
+        print(output)
 
 # Create a default instance for convenience
 _default_gadget = Gadget()
@@ -101,3 +197,18 @@ def gadget_config(verbose=True):
     """Configure the default Gadget instance."""
     global _default_gadget
     _default_gadget = Gadget(verbose=verbose)
+
+def gadget_mem(label=''):
+    """Convenience function for memory logging using default Gadget instance.
+    
+    Color-coded output:
+    - Green: all memory < 50%
+    - Yellow: any memory 50-80%
+    - Red: any memory > 80%
+    
+    Usage:
+        gadget_mem("after_loading_data")
+        gadget_mem("model_initialized")
+    """
+    caller_frame = inspect.currentframe().f_back
+    _default_gadget.mem(label, _caller_frame=caller_frame)
