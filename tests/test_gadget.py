@@ -125,7 +125,7 @@ def test_convenience_functions_and_config(monkeypatch):
 
 
 def test_version_export():
-    assert gadget_module.__version__ == "0.1.0"
+    assert gadget_module.__version__ == "0.2.0"
 
 
 def test_gadget_mem_missing_psutil(monkeypatch, capsys):
