@@ -5,7 +5,7 @@ import os
 import shutil
 import re
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 class Gadget:
     def __init__(self, verbose=True):
